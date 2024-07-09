@@ -1,0 +1,52 @@
+import keyring
+from flask import Flask, request
+from passlib.hash import sha256_crypt
+import sqlite3
+import hashlib
+
+# Crear una base de datos SQLite
+conn = sqlite3.connect('usuarios.db')
+c = conn.cursor()
+
+# Crear tabla para almacenar usuarios
+c.execute('''CREATE TABLE IF NOT EXISTS usuarios
+             (nombre TEXT, contrasena TEXT)''')
+
+# Agregar usuarios y contraseñas en hash a la base de datos
+usuarios = {
+    "Carlos Gonzalez": "contrasena1",
+    "Alexander Ortiz": "contrasena2"
+}
+
+for nombre, contrasena in usuarios.items():
+    hash_contrasena = sha256_crypt.hash(contrasena)
+    c.execute("INSERT INTO usuarios VALUES (?, ?)", (nombre, hash_contrasena))
+
+# Guardar cambios en la base de datos
+conn.commit()
+
+# Iniciar la aplicación web con Flask
+app = Flask(__name__)
+
+@app.route('/', methods=['POST'])
+def validar_usuario():
+    nombre = request.form['nombre']
+    contrasena = request.form['contrasena']
+
+    # Obtener el hash de la contraseña almacenada en la base de datos
+    c.execute("SELECT contrasena FROM usuarios WHERE nombre=?", (nombre,))
+    resultado = c.fetchone()
+
+    if resultado:
+        hash_contrasena = resultado[0]
+        if sha256_crypt.verify(contrasena, hash_contrasena):
+            return "Usuario válido"
+    
+    return "Usuario inválido"
+
+# Ejecutar la aplicación en el puerto 5800
+if __name__ == '__main__':
+    app.run(port=5800)
+
+# Cerrar la conexión a la base de datos
+conn.close()
